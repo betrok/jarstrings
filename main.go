@@ -95,8 +95,6 @@ func main() {
 			continue
 		}
 		
-		log.Println(f.Name)
-		
 		rf, err := f.Open()
 		if(err != nil) { log.Fatal(err) }
 		if(r_flag) {
@@ -113,6 +111,7 @@ func main() {
 			if(err != nil) { log.Fatal(err) }
 		}
 		
+		first := false
 		buf := make([]byte, 8)
 		var tag uint8
 		var strlen, i uint16
@@ -136,6 +135,10 @@ func main() {
 					case r_flag:
 						modifed := find.ReplaceAllLiteral(buf[:strlen], []byte(replace))
 						if(!bytes.Equal(modifed, buf[:strlen])) {
+							if(!first) {
+								first = true
+								log.Println(f.Name)
+							}
 							log.Printf("  \"%s\" => \"%s\"", string(buf[:strlen]), string(modifed))
 						}
 						strlen = uint16(len(modifed))
@@ -146,10 +149,18 @@ func main() {
 						
 					case find != nil:
 						if(find.Match(buf[:strlen])) {
+							if(!first) {
+								first = true
+								log.Println(f.Name)
+							}
 							log.Println("  ", string(buf[:strlen]))
 						}
 						
 					default:
+						if(!first) {
+							first = true
+							log.Println(f.Name)
+						}
 						log.Println("  ", string(buf[:strlen]))
 				}
 				
@@ -172,6 +183,6 @@ func main() {
 		}
 		
 		rf.Close()
-		log.Println()
+		if(first) { log.Println() }
 	}
 }
