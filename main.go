@@ -129,7 +129,8 @@ func main() {
 				if(err != nil) { log.Fatal(err) }
 				
 				if(cap(buf) < int(strlen)) { buf = make([]byte, 0, strlen) }
-				_, err = rf.Read(buf[:strlen])
+				_, err := io.ReadFull(rf, buf[:strlen])
+				if(err != nil) { log.Fatal(err) }
 				
 				switch {
 					case r_flag:
@@ -153,7 +154,7 @@ func main() {
 				}
 				
 			} else if l, ok := type_len[tag]; ok {
-				_, err = rf.Read(buf[:l])
+				_, err = io.ReadFull(rf, buf[:l])
 				if(err != nil) { log.Fatal(err) }
 				if(r_flag) {
 					_, err = wf.Write(buf[:l])
