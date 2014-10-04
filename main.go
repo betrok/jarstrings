@@ -4,6 +4,7 @@ import (
 	"os"
 	"io"
 	"log"
+	"flag"
 	"bytes"
 	"regexp"
 	"strings"
@@ -27,8 +28,10 @@ var (
 	}
 	
 	find *regexp.Regexp
-	r_flag bool
+	replace_flag bool
 	input, replace, output string
+	
+	skip_meta bool
 )
 
 type preConstHeader struct {
@@ -42,32 +45,41 @@ func main() {
 	log.SetFlags(0)
 	log.SetOutput(os.Stdout)
 	
+	flag.BoolVar(&skip_meta, "s", false, "")
+	flag.Usage = func() { log.Printf(`Usage: %s [options] <file.jar> [find_regexp] [replace_string output.jar]
+		
+		-s	do not copy META-INF`, os.Args[0]) }
+	flag.Parse()
+	
+	args := flag.Args()
+	
 	var err error
-	switch len(os.Args) {
-		case 5:
-			r_flag = true
-			output = os.Args[4]
-			replace = os.Args[3]
-			fallthrough
-			
-		case 3:
-			find, err = regexp.Compile(os.Args[2])
-			if(err != nil) { log.Fatal(err) }
+	switch len(args) {
+		case 4:
+			replace_flag = true
+			output = args[3]
+			replace = args[2]
 			fallthrough
 			
 		case 2:
-			input = os.Args[1]
+			find, err = regexp.Compile(args[1])
+			if(err != nil) { log.Fatal(err) }
+			fallthrough
+			
+		case 1:
+			input = args[1]
 			
 		default:
-			log.Fatalf(`Usage: %s <file.jar> [find_regexp] [replace_string output.jar]`, os.Args[0])
+			flag.Usage()
+			os.Exit(1)
 	}
-	r, err := zip.OpenReader(os.Args[1])
+	r, err := zip.OpenReader(args[0])
 	if err != nil {
 		log.Fatal(err)
 	}
 	defer r.Close()
 	var w *zip.Writer
-	if(r_flag) {
+	if(replace_flag) {
 		fd, err := os.Create(output)
 		if err != nil {
 			log.Fatal(err)
@@ -80,24 +92,24 @@ func main() {
 	var header preConstHeader
 	var wf io.Writer
 	for _, f := range r.File {
-		if(strings.HasSuffix(f.Name, "/") || strings.HasPrefix(f.Name, "META-INF")) { continue }
+		if(strings.HasSuffix(f.Name, "/") || (skip_meta && strings.HasPrefix(f.Name, "META-INF"))) { continue }
 		
 		if(!strings.HasSuffix(f.Name, ".class")) {
-			rf, err := f.Open()
-			if(err != nil) { log.Fatal(err) }
-			if(r_flag) {
+			if(replace_flag) {
+				rf, err := f.Open()
+				if(err != nil) { log.Fatal(err) }
 				wf, err = w.Create(f.Name)
 				if(err != nil) { log.Fatal(err) }
 				_, err = io.Copy(wf, rf)
 				if(err != nil) { log.Fatal(err) }
+				rf.Close()
 			}
-			rf.Close()
 			continue
 		}
 		
 		rf, err := f.Open()
 		if(err != nil) { log.Fatal(err) }
-		if(r_flag) {
+		if(replace_flag) {
 			wf, err = w.Create(f.Name)
 			if(err != nil) { log.Fatal(err) }
 		}
@@ -106,7 +118,7 @@ func main() {
 		if(err != nil) { log.Fatal(err) }
 		
 		if(header.Magic != 0xCAFEBABE) { log.Fatal("Isn't 0xCAFEBABE") }
-		if(r_flag) {
+		if(replace_flag) {
 			err = binary.Write(wf, binary.BigEndian, &header)
 			if(err != nil) { log.Fatal(err) }
 		}
@@ -118,7 +130,7 @@ func main() {
 		for i = 1; i < header.ConstCount; i++ {
 			err = binary.Read(rf, binary.BigEndian, &tag)
 			if(err != nil) { log.Fatal(err) }
-			if(r_flag) {
+			if(replace_flag) {
 				err = binary.Write(wf, binary.BigEndian, &tag)
 				if(err != nil) { log.Fatal(err) }
 			}
@@ -132,7 +144,7 @@ func main() {
 				if(err != nil) { log.Fatal(err) }
 				
 				switch {
-					case r_flag:
+					case replace_flag:
 						modifed := find.ReplaceAllLiteral(buf[:strlen], []byte(replace))
 						if(!bytes.Equal(modifed, buf[:strlen])) {
 							if(!first) {
@@ -167,7 +179,7 @@ func main() {
 			} else if l, ok := type_len[tag]; ok {
 				_, err = io.ReadFull(rf, buf[:l])
 				if(err != nil) { log.Fatal(err) }
-				if(r_flag) {
+				if(replace_flag) {
 					_, err = wf.Write(buf[:l])
 					if(err != nil) { log.Fatal(err) }
 				}
@@ -177,7 +189,7 @@ func main() {
 			}
 			if(err != nil) { log.Fatal(err) }
 		}
-		if(r_flag) {
+		if(replace_flag) {
 			_, err = io.Copy(wf, rf)
 			if(err != nil) { log.Fatal(err) }
 		}
