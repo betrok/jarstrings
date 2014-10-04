@@ -67,13 +67,13 @@ func main() {
 			fallthrough
 			
 		case 1:
-			input = args[1]
+			input = args[0]
 			
 		default:
 			flag.Usage()
 			os.Exit(1)
 	}
-	r, err := zip.OpenReader(args[0])
+	r, err := zip.OpenReader(input)
 	if err != nil {
 		log.Fatal(err)
 	}
