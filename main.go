@@ -25,6 +25,9 @@ var (
 		10:	4,	//method reference
 		11:	4,	//interface reference
 		12:	4,	//name or type descriptor
+		15:	3,	//method handle
+		16:	2,	//method type
+		18:	4,	//InvokeDynamic
 	}
 	
 	find *regexp.Regexp
